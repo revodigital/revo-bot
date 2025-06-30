@@ -4,7 +4,7 @@ const MAX_TOKENS = 800;
 
 export function chunkText(text: string): string[] {
   const encoder = get_encoding("cl100k_base");
-  const sentences = text.split(/(?<=[.?!])\s+/); // split su fine frase
+  const sentences = text.split(/(?<=[.?!])\s+/);
   const chunks: string[] = [];
 
   let currentChunk = "";

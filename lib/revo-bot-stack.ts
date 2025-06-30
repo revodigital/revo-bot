@@ -2,8 +2,6 @@ import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as path from "path";
-import * as google_json from "../google_credentials.json";
-import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import { NodejsFunction, OutputFormat } from "aws-cdk-lib/aws-lambda-nodejs";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as dotenv from "dotenv";
@@ -53,18 +51,6 @@ export class RevoBotStack extends cdk.Stack {
         },
       },
     );
-
-    const secret = new secretsmanager.Secret(this, "revo-bot-gcp-credentials", {
-      secretName: "revo-bot-gcp-credentials",
-      generateSecretString: {
-        secretStringTemplate: JSON.stringify({
-          GDRIVE_SERVICE_ACCOUNT_JSON: JSON.stringify(google_json),
-        }),
-        generateStringKey: "unused", // dummy key to satisfy CDK requirement
-      },
-    });
-
-    secret.grantRead(embeddingLambda);
 
     const embeddingBucket = new s3.Bucket(this, "revo-bot-embedding-docs", {
       bucketName: "revo-bot-embedding-docs",
