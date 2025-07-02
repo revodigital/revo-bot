@@ -1,17 +1,27 @@
 import * as cdk from "aws-cdk-lib";
-import { Construct } from "constructs";
+import { Duration } from "aws-cdk-lib";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as path from "path";
-import { NodejsFunction, OutputFormat } from "aws-cdk-lib/aws-lambda-nodejs";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as dotenv from "dotenv";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
+import * as scheduler from "aws-cdk-lib/aws-scheduler";
+import * as targets from "aws-cdk-lib/aws-scheduler-targets";
+import { NodejsFunction, OutputFormat } from "aws-cdk-lib/aws-lambda-nodejs";
+import { Construct } from "constructs";
 
 dotenv.config();
 
 export class RevoBotStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
+
+    const embeddingBucket = new s3.Bucket(this, "revo-bot-embedding-docs", {
+      bucketName: "revo-bot-embedding-docs",
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+    });
 
     const embeddingLambda = new NodejsFunction(
       this,
@@ -28,7 +38,7 @@ export class RevoBotStack extends cdk.Stack {
           SUPABASE_URL: process.env.SUPABASE_URL!,
           SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY!,
           TIKTOKEN_WASM: "tiktoken_bg.wasm",
-          EMBEDDING_BUCKET: "revo-bot-embedding-docs",
+          EMBEDDING_BUCKET: embeddingBucket.bucketName,
         },
         bundling: {
           externalModules: [],
@@ -52,17 +62,16 @@ export class RevoBotStack extends cdk.Stack {
       },
     );
 
-    const embeddingBucket = new s3.Bucket(this, "revo-bot-embedding-docs", {
-      bucketName: "revo-bot-embedding-docs",
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-      autoDeleteObjects: true,
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-    });
-
     embeddingBucket.grantRead(embeddingLambda);
 
-    new cdk.CfnOutput(this, "EmbeddingBucketName", {
-      value: embeddingBucket.bucketName,
+    const target = new targets.LambdaInvoke(embeddingLambda, {
+      input: scheduler.ScheduleTargetInput.fromObject({}),
+    });
+
+    const schedule = new scheduler.Schedule(this, "revo-bot-embed-schedule", {
+      schedule: scheduler.ScheduleExpression.rate(Duration.days(1)),
+      target,
+      description: "Invoke embedding lambda everyday",
     });
 
     const askLambda = new NodejsFunction(this, "revo-bot-ask-function", {
@@ -116,5 +125,32 @@ export class RevoBotStack extends cdk.Stack {
     askResource.addMethod("GET", new apigateway.LambdaIntegration(askLambda), {
       apiKeyRequired: true,
     });
+
+    const slackHandler = new NodejsFunction(this, "revo-bot-slack-handler", {
+      entry: path.join(__dirname, "../src/function/slack-handler/index.ts"),
+      runtime: lambda.Runtime.NODEJS_22_X,
+      handler: "index.handler",
+      memorySize: 512,
+      timeout: cdk.Duration.seconds(30),
+      environment: {
+        SLACK_BOT_TOKEN: process.env.SLACK_BOT_TOKEN!,
+        SLACK_BOT_USER_ID: process.env.SLACK_BOT_USER_ID!,
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY!,
+        SUPABASE_URL: process.env.SUPABASE_URL!,
+        SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        EMBEDDING_BUCKET: embeddingBucket.bucketName,
+      },
+      bundling: {
+        externalModules: [],
+        format: OutputFormat.CJS,
+        target: "node22",
+      },
+    });
+
+    const slackResource = api.root.addResource("slack");
+    slackResource.addMethod(
+      "POST",
+      new apigateway.LambdaIntegration(slackHandler),
+    );
   }
 }

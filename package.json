@@ -36,6 +36,7 @@
     "@aws-sdk/client-secrets-manager": "^3.839.0",
     "@dqbd/tiktoken": "^1.0.21",
     "@opensearch-project/opensearch": "^3.5.1",
+    "@slack/web-api": "^7.9.3",
     "@supabase/supabase-js": "^2.50.2",
     "aws-cdk-lib": "2.201.0",
     "constructs": "^10.0.0",
