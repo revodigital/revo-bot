@@ -1,9 +1,21 @@
 import { WebClient } from "@slack/web-api";
-import { getEmbedding } from "../../shared/get-embedding";
-import { matchDocuments } from "../../shared/match-documents";
-import { buildPrompt } from "../../shared/build-prompt";
-import { callOpenAI } from "../../shared/openai";
-import { formatSources } from "../../shared/sources";
+import { getEmbedding } from "../../shared/prompt/get-embedding";
+import { matchDocuments } from "../../shared/prompt/match-documents";
+import {
+  buildCommentPrompt,
+  buildPrompt,
+} from "../../shared/prompt/build-prompt";
+import { callOpenAI } from "../../shared/prompt/openai";
+import { detectBudgetIntent } from "../../shared/metabase/detect-intent";
+import { queryBudgetProject } from "../../shared/metabase/query-budget-for-project";
+import {
+  parseBudgetResponse,
+  wrapBudgetSummary,
+} from "../../shared/metabase/parse-budget";
+import {
+  buildFinalResponse,
+  formatBudgetMessage,
+} from "../../shared/metabase/format-budget-response";
 
 const slack = new WebClient(process.env.SLACK_BOT_TOKEN!);
 const botUserId = process.env.SLACK_BOT_USER_ID!;
@@ -11,9 +23,6 @@ const botUserId = process.env.SLACK_BOT_USER_ID!;
 export const handler = async (event: any) => {
   const body = JSON.parse(event.body);
   const slackEvent = body.event;
-
-  console.log("Received headers:", JSON.stringify(event.headers, null, 2));
-  console.log("Received body:", JSON.stringify(event.body, null, 2));
 
   if (event.headers["X-Slack-Retry-Num"]) {
     return {
@@ -23,7 +32,6 @@ export const handler = async (event: any) => {
   }
 
   if (body.type === "url_verification") {
-    console.log("challenge");
     return { statusCode: 200, body: body.challenge };
   }
 
@@ -31,7 +39,6 @@ export const handler = async (event: any) => {
     slackEvent.type !== "app_mention" ||
     !slackEvent.text.includes(`<@${botUserId}>`)
   ) {
-    console.log(body, "ignored event");
     return { statusCode: 200, body: "Ignored event" };
   }
 
@@ -39,29 +46,53 @@ export const handler = async (event: any) => {
   const thread_ts = slackEvent.thread_ts || slackEvent.ts;
 
   try {
-    const embedding = await getEmbedding(userQuery);
-    const matches = await matchDocuments(embedding);
-    const prompt = buildPrompt(matches, userQuery);
-    const answer = await callOpenAI(prompt);
-    const sources = formatSources(matches);
+    const intent = await detectBudgetIntent(userQuery);
 
-    // TODO: re-add sources once more structured
-    const reply = `${answer}`;
+    if (intent.isBudgetQuestion && intent.projectKey) {
+      // TODO: maybe extrapolate in dedicated wrapper function
+      const metabaseResponse = await queryBudgetProject(intent.projectKey);
+      const budget = wrapBudgetSummary(parseBudgetResponse(metabaseResponse));
 
-    await slack.chat.postMessage({
-      channel: slackEvent.channel,
-      thread_ts,
-      text: reply,
-    });
+      if (!budget.rows[0]) throw new Error();
 
-    console.log("all good");
+      const budgetText = formatBudgetMessage(budget);
+      const commentPrompt = buildCommentPrompt(
+        intent.projectKey,
+        budget,
+        userQuery,
+      );
+      const aiComment = await callOpenAI(commentPrompt);
+      const finalReply = buildFinalResponse({
+        projectCode: intent.projectKey,
+        budgetSummaryText: budgetText,
+        aiComment,
+      });
+
+      await slack.chat.postMessage({
+        channel: slackEvent.channel,
+        thread_ts,
+        text: finalReply,
+      });
+    } else {
+      const embedding = await getEmbedding(userQuery);
+      const matches = await matchDocuments(embedding);
+      const prompt = buildPrompt(matches, userQuery);
+      const aiReply = await callOpenAI(prompt);
+
+      await slack.chat.postMessage({
+        channel: slackEvent.channel,
+        thread_ts,
+        text: `${aiReply}`,
+      });
+    }
+
     return { statusCode: 200, body: "OK" };
   } catch (err) {
     console.error("Slack handler error:", err);
     await slack.chat.postMessage({
       channel: slackEvent.channel,
       thread_ts,
-      text: "😓 Errore nella generazione della risposta. Riprova o contatta il team Revo.",
+      text: "Mi spiace caro, non sono riuscito a generare una risposta sensata 😓 \nRiprova o contatta il team Revo",
     });
     return { statusCode: 500, body: "Internal Error" };
   }

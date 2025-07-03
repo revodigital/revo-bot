@@ -19,6 +19,4 @@ export const handler = async () => {
       });
     }
   }
-
-  console.log(`✅ Indicizzazione completata: ${documents.length} documenti`);
 };

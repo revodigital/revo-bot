@@ -1,8 +1,8 @@
-import { getEmbedding } from "../../shared/get-embedding";
-import { matchDocuments } from "../../shared/match-documents";
-import { buildPrompt } from "../../shared/build-prompt";
-import { callOpenAI } from "../../shared/openai";
-import { formatSources } from "../../shared/sources";
+import { getEmbedding } from "../../shared/prompt/get-embedding";
+import { matchDocuments } from "../../shared/prompt/match-documents";
+import { buildPrompt } from "../../shared/prompt/build-prompt";
+import { callOpenAI } from "../../shared/prompt/openai";
+import { formatSources } from "../../shared/prompt/sources";
 
 export const handler = async (event: any) => {
   const query = event.queryStringParameters?.q;

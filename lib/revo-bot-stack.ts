@@ -139,6 +139,8 @@ export class RevoBotStack extends cdk.Stack {
         SUPABASE_URL: process.env.SUPABASE_URL!,
         SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY!,
         EMBEDDING_BUCKET: embeddingBucket.bucketName,
+        METABASE_URL: process.env.METABASE_URL!,
+        METABASE_API_KEY: process.env.METABASE_API_KEY!,
       },
       bundling: {
         externalModules: [],
