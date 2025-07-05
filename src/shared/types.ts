@@ -13,3 +13,13 @@ export interface BudgetSummary {
   totalRemaining: number;
   rows: BudgetRow[];
 }
+
+export enum Intents {
+  BUDGET = "BUDGET",
+  GENERIC = "GENERIC",
+}
+
+export enum TurnTypes {
+  USER = "user",
+  ASSISTANT = "assistant",
+}

@@ -70,7 +70,11 @@ Il team di revo è composto dalle persone che seguono: quando ritieni opportuno 
 * Leo: è il founder e PM. 
 `;
 
-export function buildPrompt(matches: any[], query: string): string {
+export function buildInitialPrompt(
+  matches: any[],
+  query: string,
+  previousContext?: string,
+): string {
   const context = matches.length
     ? matches?.map((match, i) => `Fonte ${i + 1}:\n${match.text}`).join("\n\n")
     : [];
@@ -91,6 +95,7 @@ export function buildCommentPrompt(
   projectCode: string,
   budget: BudgetSummary,
   userPrompt: string,
+  previousContext?: string,
 ): string {
   const overBudget = budget.rows.filter((r) => r.overBudget).length;
   const atRisk = budget.rows.filter((r) => r.atRisk && !r.overBudget).length;

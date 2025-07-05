@@ -7,6 +7,7 @@ import * as dotenv from "dotenv";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import * as scheduler from "aws-cdk-lib/aws-scheduler";
 import * as targets from "aws-cdk-lib/aws-scheduler-targets";
+import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import { NodejsFunction, OutputFormat } from "aws-cdk-lib/aws-lambda-nodejs";
 import { Construct } from "constructs";
 
@@ -126,6 +127,18 @@ export class RevoBotStack extends cdk.Stack {
       apiKeyRequired: true,
     });
 
+    const threadContextTable = new dynamodb.Table(
+      this,
+      "revo-bot-thread-context-table",
+      {
+        tableName: "revo-bot-thread-context-table",
+        partitionKey: { name: "pk", type: dynamodb.AttributeType.STRING },
+        billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+        timeToLiveAttribute: "expires_at",
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      },
+    );
+
     const slackHandler = new NodejsFunction(this, "revo-bot-slack-handler", {
       entry: path.join(__dirname, "../src/function/slack-handler/index.ts"),
       runtime: lambda.Runtime.NODEJS_22_X,
@@ -141,6 +154,7 @@ export class RevoBotStack extends cdk.Stack {
         EMBEDDING_BUCKET: embeddingBucket.bucketName,
         METABASE_URL: process.env.METABASE_URL!,
         METABASE_API_KEY: process.env.METABASE_API_KEY!,
+        DYNAMO_THREAD_CONTEXT_TABLE: threadContextTable.tableName,
       },
       bundling: {
         externalModules: [],
@@ -148,6 +162,8 @@ export class RevoBotStack extends cdk.Stack {
         target: "node22",
       },
     });
+
+    threadContextTable.grantReadWriteData(slackHandler);
 
     const slackResource = api.root.addResource("slack");
     slackResource.addMethod(

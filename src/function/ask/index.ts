@@ -1,7 +1,7 @@
 import { getEmbedding } from "../../shared/prompt/get-embedding";
 import { matchDocuments } from "../../shared/prompt/match-documents";
-import { buildPrompt } from "../../shared/prompt/build-prompt";
-import { callOpenAI } from "../../shared/prompt/openai";
+import { buildInitialPrompt } from "../../shared/prompt/build-initial-prompt";
+import { callAIAsChatCompletion } from "../../shared/prompt/openai";
 import { formatSources } from "../../shared/prompt/sources";
 
 export const handler = async (event: any) => {
@@ -10,8 +10,8 @@ export const handler = async (event: any) => {
 
   const embedding = await getEmbedding(query);
   const matches = await matchDocuments(embedding);
-  const prompt = buildPrompt(matches, query);
-  const answer = await callOpenAI(prompt);
+  const prompt = buildInitialPrompt(matches, query);
+  const answer = await callAIAsChatCompletion(prompt);
   const sources = formatSources(matches);
 
   return {

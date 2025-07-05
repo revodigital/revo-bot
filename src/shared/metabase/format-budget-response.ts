@@ -26,16 +26,16 @@ export function formatBudgetMessage(budget: BudgetSummary): string {
 }
 
 export function buildFinalResponse({
-  projectCode,
+  projectKey,
   budgetSummaryText,
   aiComment,
 }: {
-  projectCode: string;
+  projectKey: string;
   budgetSummaryText: string;
   aiComment: string;
 }): string {
   return `
-📊 *Budget per progetto \`${projectCode}\`*
+📊 *Budget per progetto \`${projectKey}\`*
 
 ${budgetSummaryText}
 

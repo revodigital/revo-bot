@@ -32,8 +32,10 @@
     "typescript": "~5.6.3"
   },
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.840.0",
     "@aws-sdk/client-s3": "^3.840.0",
     "@aws-sdk/client-secrets-manager": "^3.839.0",
+    "@aws-sdk/lib-dynamodb": "^3.840.0",
     "@dqbd/tiktoken": "^1.0.21",
     "@opensearch-project/opensearch": "^3.5.1",
     "@slack/web-api": "^7.9.3",

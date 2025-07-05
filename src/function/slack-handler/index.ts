@@ -3,9 +3,9 @@ import { getEmbedding } from "../../shared/prompt/get-embedding";
 import { matchDocuments } from "../../shared/prompt/match-documents";
 import {
   buildCommentPrompt,
-  buildPrompt,
-} from "../../shared/prompt/build-prompt";
-import { callOpenAI } from "../../shared/prompt/openai";
+  buildInitialPrompt,
+} from "../../shared/prompt/build-initial-prompt";
+import { callAIAsChatCompletion } from "../../shared/prompt/openai";
 import { detectBudgetIntent } from "../../shared/metabase/detect-intent";
 import { queryBudgetProject } from "../../shared/metabase/query-budget-for-project";
 import {
@@ -16,6 +16,12 @@ import {
   buildFinalResponse,
   formatBudgetMessage,
 } from "../../shared/metabase/format-budget-response";
+import {
+  appendToContext,
+  getContext,
+  ThreadContext,
+} from "../../shared/prompt/thread-context";
+import { TurnTypes } from "../../shared/types";
 
 const slack = new WebClient(process.env.SLACK_BOT_TOKEN!);
 const botUserId = process.env.SLACK_BOT_USER_ID!;
@@ -39,14 +45,25 @@ export const handler = async (event: any) => {
     slackEvent.type !== "app_mention" ||
     !slackEvent.text.includes(`<@${botUserId}>`)
   ) {
-    return { statusCode: 200, body: "Ignored event" };
+    console.log(`Ignored event - received: ${slackEvent.type}`);
+    return {
+      statusCode: 200,
+      body: `Ignored event - received: ${slackEvent.type}`,
+    };
   }
 
   const userQuery = slackEvent.text.replace(`<@${botUserId}>`, "").trim();
   const thread_ts = slackEvent.thread_ts || slackEvent.ts;
 
+  await appendToContext(thread_ts, {
+    role: TurnTypes.USER,
+    content: userQuery,
+  });
+
   try {
-    const intent = await detectBudgetIntent(userQuery);
+    const context = await getContext(thread_ts);
+
+    const intent = await detectBudgetIntent(userQuery, context?.toString());
 
     if (intent.isBudgetQuestion && intent.projectKey) {
       // TODO: maybe extrapolate in dedicated wrapper function
@@ -60,10 +77,11 @@ export const handler = async (event: any) => {
         intent.projectKey,
         budget,
         userQuery,
+        context?.toString(),
       );
-      const aiComment = await callOpenAI(commentPrompt);
+      const aiComment = await callAIAsChatCompletion(commentPrompt);
       const finalReply = buildFinalResponse({
-        projectCode: intent.projectKey,
+        projectKey: intent.projectKey,
         budgetSummaryText: budgetText,
         aiComment,
       });
@@ -73,16 +91,39 @@ export const handler = async (event: any) => {
         thread_ts,
         text: finalReply,
       });
+
+      await appendToContext(
+        thread_ts,
+        {
+          role: TurnTypes.ASSISTANT,
+          content: finalReply,
+        },
+        {
+          projectKey: intent.projectKey,
+        },
+      );
     } else {
+      const context = await getContext(thread_ts);
+
       const embedding = await getEmbedding(userQuery);
       const matches = await matchDocuments(embedding);
-      const prompt = buildPrompt(matches, userQuery);
-      const aiReply = await callOpenAI(prompt);
+      const prompt = context
+        ? buildInitialPrompt(matches, userQuery)
+        : userQuery;
+      const aiReply = await callAIAsChatCompletion(
+        prompt,
+        context as ThreadContext,
+      );
 
       await slack.chat.postMessage({
         channel: slackEvent.channel,
         thread_ts,
         text: `${aiReply}`,
+      });
+
+      await appendToContext(thread_ts, {
+        role: TurnTypes.ASSISTANT,
+        content: aiReply,
       });
     }
 
