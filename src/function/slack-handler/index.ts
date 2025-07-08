@@ -42,10 +42,13 @@ export const handler = async (event: any) => {
   }
 
   if (
-    slackEvent.type !== "app_mention" ||
-    !slackEvent.text.includes(`<@${botUserId}>`)
+    slackEvent.user === process.env.SLACK_BOT_USER_ID || // prevents bot from replying to themselves
+    (slackEvent.type !== "app_mention" && slackEvent.type !== "message") ||
+    (slackEvent.type === "app_mention" &&
+      !slackEvent.text.includes(`<@${botUserId}>`)) ||
+    (slackEvent.type === "message" && slackEvent.channel_type !== "im")
   ) {
-    console.log(`Ignored event - received: ${slackEvent.type}`);
+    console.warn("Ignored event", slackEvent);
     return {
       statusCode: 200,
       body: `Ignored event - received: ${slackEvent.type}`,

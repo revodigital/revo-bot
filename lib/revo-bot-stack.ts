@@ -69,7 +69,7 @@ export class RevoBotStack extends cdk.Stack {
       input: scheduler.ScheduleTargetInput.fromObject({}),
     });
 
-    const schedule = new scheduler.Schedule(this, "revo-bot-embed-schedule", {
+    new scheduler.Schedule(this, "revo-bot-embed-schedule", {
       schedule: scheduler.ScheduleExpression.rate(Duration.hours(3)),
       target,
       description: "Invoke embedding lambda every three hours",
