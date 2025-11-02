@@ -8,7 +8,7 @@ const openai = new OpenAI({
 
 export const AIConfig = {
   temperature: 0.45,
-  model: "gpt-4o",
+  model: "gpt-5-mini",
 };
 
 export async function callAIAsChatCompletion(
