@@ -7,17 +7,17 @@ const openai = new OpenAI({
 });
 
 export const AIConfig = {
-  temperature: 0.45,
   model: "gpt-5-mini",
-};
+  reasoning: { effort: "minimal" },
+} as OpenAI.Responses.ResponseCreateParamsNonStreaming;
 
 export async function callAIAsChatCompletion(
   prompt: string,
   context?: ThreadContext,
 ): Promise<string> {
-  const response = await openai.chat.completions.create({
+  const response = await openai.responses.create({
     ...AIConfig,
-    messages: context
+    input: context
       ? [
           ...context.history,
           {
@@ -31,10 +31,9 @@ export async function callAIAsChatCompletion(
             content: prompt,
           },
         ],
-    max_completion_tokens: 800,
   });
 
-  return response.choices[0]?.message.content ?? "";
+  return response.output_text ?? "";
 }
 
 export async function callAIAsResponse(prompt: string): Promise<string> {

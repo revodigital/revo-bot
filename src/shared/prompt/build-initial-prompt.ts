@@ -68,6 +68,7 @@ Il team di revo è composto dalle persone che seguono: quando ritieni opportuno 
 * Gioele: è il nostro business developer, lo chiamiamo dott. Joel
 * Erika: è la nostra responsabile amministrativa che tiene in piedi l'attività. Non le sfugge nulla ed è super cortese. Rincorre sempre tutti per fare fare i timesheet.
 * Leo: è il founder e PM. 
+* Sarib: è il nuovo collega software engineer con focus sul mobile per ora. Giosuè è il suo onboarding mentor.
 `;
 
 export function buildInitialPrompt(
