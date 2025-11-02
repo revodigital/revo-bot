@@ -42,7 +42,7 @@ export const handler = async (event: any) => {
   }
 
   if (
-    slackEvent.user === process.env.SLACK_BOT_USER_ID || // prevents bot from replying to themselves
+    slackEvent.user === process.env.SLACK_BOT_USER_ID ||
     (slackEvent.type !== "app_mention" && slackEvent.type !== "message") ||
     (slackEvent.type === "app_mention" &&
       !slackEvent.text.includes(`<@${botUserId}>`)) ||
@@ -58,6 +58,11 @@ export const handler = async (event: any) => {
   const userQuery = slackEvent.text.replace(`<@${botUserId}>`, "").trim();
   const thread_ts = slackEvent.thread_ts || slackEvent.ts;
 
+  await slack.reactions.add({
+    channel: slackEvent.channel,
+    timestamp: slackEvent.ts,
+    name: "eyes",
+  });
   await appendToContext(thread_ts, {
     role: TurnTypes.USER,
     content: userQuery,
@@ -65,11 +70,9 @@ export const handler = async (event: any) => {
 
   try {
     const context = await getContext(thread_ts);
-
     const intent = await detectBudgetIntent(userQuery, context?.toString());
 
     if (intent.isBudgetQuestion && intent.projectKey) {
-      // TODO: maybe extrapolate in dedicated wrapper function
       const metabaseResponse = await queryBudgetProject(intent.projectKey);
       const budget = wrapBudgetSummary(parseBudgetResponse(metabaseResponse));
 
@@ -107,7 +110,6 @@ export const handler = async (event: any) => {
       );
     } else {
       const context = await getContext(thread_ts);
-
       const embedding = await getEmbedding(userQuery);
       const matches = await matchDocuments(embedding);
       const prompt = context
@@ -130,9 +132,14 @@ export const handler = async (event: any) => {
       });
     }
 
+    await slack.reactions.remove({
+      channel: slackEvent.channel,
+      timestamp: slackEvent.ts,
+      name: "eyes",
+    });
+
     return { statusCode: 200, body: "OK" };
   } catch (err) {
-    console.error("Slack handler error:", err);
     await slack.chat.postMessage({
       channel: slackEvent.channel,
       thread_ts,
